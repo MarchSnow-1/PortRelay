@@ -6,13 +6,13 @@ A lightweight cross-protocol port forwarding and tunneling tool built with Go.
 
 <!-- Badges -->
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/MarchSnow/PortRelay)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
 [![Golang](https://img.shields.io/badge/Golang-1.24%2B-green?style=for-the-badge)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange?style=for-the-badge)](LICENSE)
 <br>
-[![GitHub Release](https://img.shields.io/github/v/release/MarchSnow/PortRelay?style=for-the-badge)](https://github.com/MarchSnow/PortRelay/releases)
-[![GitHub Repo stars](https://img.shields.io/github/stars/MarchSnow/PortRelay?style=for-the-badge)](https://github.com/MarchSnow/PortRelay)
-[![GitHub Last Commit](https://img.shields.io/github/last-commit/MarchSnow/PortRelay?style=for-the-badge)](https://github.com/MarchSnow/PortRelay)
+[![GitHub Release](https://img.shields.io/github/v/release/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay/releases)
+[![GitHub Repo stars](https://img.shields.io/github/stars/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
@@ -29,7 +29,7 @@ PortRelay is a lightweight network tool written in Go, supporting:
 
 ## Quick Start (Release Binary)
 
-Download the binary for your platform from [Releases](https://github.com/MarchSnow/PortRelay/releases) and run:
+Download the binary for your platform from [Releases](https://github.com/MarchSnow-1/PortRelay/releases) and run:
 
 ```bash
 # Server
@@ -261,7 +261,7 @@ Four transport combinations with different reliability guarantees:
 ### Build
 
 ```bash
-git clone https://github.com/MarchSnow/PortRelay.git
+git clone https://github.com/MarchSnow-1/PortRelay.git
 cd PortRelay/src
 go build -o ../portrelay .
 ```

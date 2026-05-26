@@ -6,13 +6,13 @@
 
 <!-- Badges -->
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/MarchSnow/PortRelay)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
 [![Golang](https://img.shields.io/badge/Golang-1.24%2B-green?style=for-the-badge)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange?style=for-the-badge)](LICENSE)
 <br>
-[![GitHub Release](https://img.shields.io/github/v/release/MarchSnow/PortRelay?style=for-the-badge)](https://github.com/MarchSnow/PortRelay/releases)
-[![GitHub Repo stars](https://img.shields.io/github/stars/MarchSnow/PortRelay?style=for-the-badge)](https://github.com/MarchSnow/PortRelay)
-[![GitHub Last Commit](https://img.shields.io/github/last-commit/MarchSnow/PortRelay?style=for-the-badge)](https://github.com/MarchSnow/PortRelay)
+[![GitHub Release](https://img.shields.io/github/v/release/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay/releases)
+[![GitHub Repo stars](https://img.shields.io/github/stars/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
@@ -29,7 +29,7 @@ PortRelay 是一个 Go 语言编写的轻量级网络工具, 支持:
 
 ## 快速开始（使用 Release 二进制）
 
-从 [Releases](https://github.com/MarchSnow/PortRelay/releases) 下载对应平台的二进制, 直接运行: 
+从 [Releases](https://github.com/MarchSnow-1/PortRelay/releases) 下载对应平台的二进制, 直接运行: 
 
 ```bash
 # 服务端
@@ -260,7 +260,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 ### 构建
 
 ```bash
-git clone https://github.com/MarchSnow/PortRelay.git
+git clone https://github.com/MarchSnow-1/PortRelay.git
 cd PortRelay/src
 go build -o ../portrelay .
 ```
