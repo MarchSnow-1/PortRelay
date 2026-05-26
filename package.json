@@ -1,6 +1,6 @@
 {
   "name": "portrelay",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "scripts": {
     "version": "auto-changelog -p && git add CHANGELOG.md"
   },
