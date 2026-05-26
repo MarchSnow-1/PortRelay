@@ -1,0 +1,121 @@
+name: Build Dev
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ===== Windows =====
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            platform: windows-amd64
+            ext: .exe
+
+          # ===== Linux =====
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            platform: linux-amd64
+            ext: ""
+
+          - os: ubuntu-22.04
+            goos: linux
+            goarch: arm64
+            platform: linux-arm64
+            ext: ""
+
+          - os: ubuntu-22.04
+            goos: linux
+            goarch: arm
+            goarm: "7"
+            platform: linux-armv7
+            ext: ""
+
+          # ===== macOS =====
+          - os: macos-15-intel
+            goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+            ext: ""
+
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+            ext: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          RAW=$(git describe --tags --always --long 2>/dev/null || echo "")
+          if echo "$RAW" | grep -Eq '^.+-[0-9]+-g[a-f0-9]+$'; then
+            VER=$(echo "$RAW" | sed -E 's/^(.+)-([0-9]+)-(g[a-f0-9]+)$/\1-beta\2-\3/')
+          elif echo "$RAW" | grep -Eq '^[a-f0-9]+$'; then
+            VER="0.0.0-beta0-g${RAW}"
+          else
+            VER="$RAW"
+          fi
+          echo "VERSION=${VER}" >> "$GITHUB_OUTPUT"
+          echo "Computed version: ${VER}"
+
+      - name: Build
+        shell: bash
+        run: |
+          export CGO_ENABLED=0
+          export GOOS=${{ matrix.goos }}
+          export GOARCH=${{ matrix.goarch }}
+          [ -n "${{ matrix.goarm }}" ] && export GOARM=${{ matrix.goarm }}
+
+          cd src
+          go build \
+            -ldflags "-s -w -X main.version=${{ steps.version.outputs.VERSION }}" \
+            -o ../dist/portrelay${{ matrix.ext }} \
+            .
+
+      - name: Rename binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          mv dist/portrelay${{ matrix.ext }} \
+             dist/PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}${{ matrix.ext }}
+
+      - name: Package (Linux / macOS)
+        if: runner.os != 'Windows'
+        run: |
+          cd dist
+          zip ../PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip \
+            PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}${{ matrix.ext }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist\PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}${{ matrix.ext }}" `
+            -DestinationPath "PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}
+          path: PortRelay-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip

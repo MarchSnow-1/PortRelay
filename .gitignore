@@ -1,0 +1,28 @@
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build output
+dist/
+build/
+scripts/
+
+# Dev files
+.dev/
+
+node_modules/
+
+# Go
+*.test
+*.out
+*.prof
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
