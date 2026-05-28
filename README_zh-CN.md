@@ -62,6 +62,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
   "name": "游戏服务中继", // 配置名称, 仅用于日志
   "mode": "server", // 运行模式: server
   "admin_passwd": "", // 全局通用密码, 空字符串 = 禁用
+  "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
   "listen_port": "9000", // 统一入口端口, TCP 和 UDP 共用
   "listen_protocol": "all", // 监听的传输协议: "tcp" / "udp" / "all"
   "proxies": [
@@ -81,6 +82,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | `name` | string | 是 | 配置名称, 仅用于日志 |
 | `mode` | string | 是 | `"server"` |
 | `admin_passwd` | string | 否 | 全局通用密码, 空字符串 = 禁用 |
+| `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
 | `listen_port` | string | 是 | 统一入口端口, 同时监听 TCP 和 UDP |
 | `listen_protocol` | string | 是 | 服务端监听的传输协议: `"tcp"` / `"udp"` / `"all"` |
 | `proxies[].name` | string | 是 | 隧道名称 (客户端需匹配) |
@@ -108,6 +110,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 {
   "name": "我的客户端", // 配置名称, 仅用于日志
   "mode": "client", // 运行模式: client
+  "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
   "proxies": [
     {
       "name": "cs2-tunnel", // 隧道名称, 必须与服务端一致
@@ -124,6 +127,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
+| `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
 | `name` | string | 是 | 必须与服务端隧道名称一致 |
 | `type` | string | 是 | `"tunnel"` |
 | `listen_protocol` | string | 是 | 本地监听协议: `"tcp"` / `"udp"` / `"all"` |
@@ -162,6 +166,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 {
   "name": "单转发模式客户端",
   "mode": "client",
+  "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
   "proxies": [
     {
       "name": "v4-to-v6-tcp", // 你的配置文件命名
@@ -176,6 +181,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
+| `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
 | `name` | string | 是 | 规则名称 |
 | `type` | string | 是 | `"direct"` |
 | `protocol` | string | 是 | `"tcp"` / `"udp"` / `"all"`（同时转发 TCP+UDP）|
@@ -201,6 +207,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 {
   "name": "多模式客户端",
   "mode": "client",
+  "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
   "proxies": [
     {
       "name": "cs2-tunnel", // 隧道规则, 连接服务端
@@ -248,6 +255,17 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | TCP in UDP | TCP | UDP | Stop-and-Wait ARQ | [kcp-go](https://github.com/xtaci/kcp-go) |
 
 **UDP in TCP 断线重连**: TCP 隧道断开后客户端自动重连, 无限次重试, 服务端将每次重连视为新连接
+
+## 检查更新
+
+在配置文件中设置 `"check_update": true` 后, 每次启动时程序会通过 GitHub API 获取最新 Release 版本号并与当前版本对比, 若有新版本将在终端打印提示:
+
+```
+2026/05/28 20:14:22 [Update] New version available: 1.0.0 (current: 0.0.6)
+2026/05/28 20:14:22 [Update] Download: https://github.com/MarchSnow-1/PortRelay/releases
+```
+
+默认不启用, 不填写或设为 `false` 时启动不会发起任何网络请求
 
 ## 从源码构建
 
