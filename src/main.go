@@ -11,7 +11,11 @@ import (
 	"portrelay/client"
 	"portrelay/config"
 	"portrelay/server"
+	"portrelay/update"
 )
+
+// Set via -ldflags at build time.
+var version = "dev"
 
 func main() {
 	configPath := flag.String("config", "", "Path to configuration file")
@@ -36,7 +40,11 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	log.Printf("PortRelay starting: name=\"%s\" mode=%s proxies=%d", cfg.Name, cfg.Mode, len(cfg.Proxies))
+	log.Printf("PortRelay starting: name=\"%s\" mode=%s proxies=%d version=%s", cfg.Name, cfg.Mode, len(cfg.Proxies), version)
+
+	if cfg.CheckUpdate {
+		update.CheckForUpdate(version)
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

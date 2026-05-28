@@ -16,6 +16,7 @@ type Config struct {
 	AdminPasswd    string  `json:"admin_passwd,omitempty"`
 	ListenPort     string  `json:"listen_port,omitempty"`
 	ListenProtocol string  `json:"listen_protocol,omitempty"`
+	CheckUpdate    bool    `json:"check_update,omitempty"`
 }
 
 type Proxy struct {
