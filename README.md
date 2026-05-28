@@ -257,7 +257,7 @@ Four transport combinations with different reliability guarantees:
 
 **UDP-in-TCP auto-reconnect**: On TCP disconnect, the client reconnects indefinitely. The server treats each reconnect as a fresh connection.
 
-## Check for Updates
+## Update Check
 
 Set `"check_update": true` in your config file. On each startup the program queries the GitHub API for the latest release tag and compares it with the current version. If a newer version is available, a reminder is printed:
 
