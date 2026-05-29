@@ -13,6 +13,7 @@ A lightweight cross-protocol port forwarding and tunneling tool built with Go.
 [![GitHub Release](https://img.shields.io/github/v/release/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay/releases)
 [![GitHub Repo stars](https://img.shields.io/github/stars/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
 [![GitHub Last Commit](https://img.shields.io/github/last-commit/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
+[![Total Download](https://img.shields.io/github/downloads/MarchSnow-1/PortRelay/total?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay/releases)
 
 [**English**](README.md) | [**简体中文**](README_zh-CN.md)
 
@@ -262,7 +263,7 @@ Four transport combinations with different reliability guarantees:
 Set `"check_update": true` in your config file. On each startup the program queries the GitHub API for the latest release tag and compares it with the current version. If a newer version is available, a reminder is printed:
 
 ```
-2026/05/28 20:14:22 [Update] New version available: 1.0.0 (current: 0.0.6)
+2026/05/28 20:14:22 [Update] New version available: 1.0.0
 2026/05/28 20:14:22 [Update] Download: https://github.com/MarchSnow-1/PortRelay/releases
 ```
 
