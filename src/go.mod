@@ -1,4 +1,4 @@
-module portrelay
+module github.com/MarchSnow-1/PortRelay
 
 go 1.24.0
 
