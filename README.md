@@ -34,10 +34,10 @@ Download the binary for your platform from [Releases](https://github.com/MarchSn
 
 ```bash
 # Server
-./portrelay --config server.json
+./portrelay --config-path server.json
 
 # Client
-./portrelay --config client.json
+./portrelay --config-path client.json
 
 # Inline config (no files needed)
 ./portrelay --config-base64 <base64-encoded-json>
@@ -50,7 +50,7 @@ PortRelay supports three config loading modes (priority high to low):
 | Priority | CLI flag | Use case |
 |----------|----------|----------|
 | 1 | `--config-base64 <base64>` | Scripts, containers, no filesystem |
-| 2 | `--config <path>` | Custom config path |
+| 2 | `--config-path <path>` | Custom config path |
 | 3 | *(none)* | Reads `config.json` alongside the binary |
 
 ### Server
@@ -64,6 +64,7 @@ PortRelay supports three config loading modes (priority high to low):
   "mode": "server", // Run mode: server
   "admin_passwd": "", // Global fallback password, empty = disabled
   "check_update": true, // Check for updates on startup, omit or false to disable
+  "log_level": "info", // Log level: "debug" / "info" / "warn" / "error" / "fatal"
   "listen_port": "9000", // Single entry port for both TCP and UDP
   "listen_protocol": "all", // Transport to listen on: "tcp" / "udp" / "all"
   "proxies": [
@@ -84,6 +85,7 @@ PortRelay supports three config loading modes (priority high to low):
 | `mode` | string | yes | `"server"` |
 | `admin_passwd` | string | no | Global fallback password. Empty = disabled |
 | `check_update` | bool | no | Check for new version on startup. Default `false` |
+| `log_level` | string | no | Log level: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`. Default `"info"`. Shows filename and line number when set to `"debug"` |
 | `listen_port` | string | yes | Single port for both TCP and UDP |
 | `listen_protocol` | string | yes | Transport protocol to listen on: `"tcp"` / `"udp"` / `"all"` |
 | `proxies[].name` | string | yes | Tunnel name (client must match) |
@@ -112,6 +114,7 @@ PortRelay supports three config loading modes (priority high to low):
   "name": "My Client", // Config label, logging only
   "mode": "client", // Run mode: client
   "check_update": true, // Check for updates on startup, omit or false to disable
+  "log_level": "info", // Log level: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
       "name": "cs2-tunnel", // Tunnel name, must match server
@@ -129,6 +132,7 @@ PortRelay supports three config loading modes (priority high to low):
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `check_update` | bool | no | Check for new version on startup. Default `false` |
+| `log_level` | string | no | Log level: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`. Default `"info"`. Shows filename and line number when set to `"debug"` |
 | `name` | string | yes | Must match server tunnel name |
 | `type` | string | yes | `"tunnel"` |
 | `listen_protocol` | string | yes | Local listen protocol: `"tcp"` / `"udp"` / `"all"` |
@@ -168,6 +172,7 @@ No server required. Fixed IPv4 ↔ IPv6 port forwarding.
   "name": "Direct Forward Client",
   "mode": "client",
   "check_update": true, // Check for updates on startup, omit or false to disable
+  "log_level": "info", // Log level: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
       "name": "v4-to-v6-tcp", // Rule name
@@ -183,6 +188,7 @@ No server required. Fixed IPv4 ↔ IPv6 port forwarding.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `check_update` | bool | no | Check for new version on startup. Default `false` |
+| `log_level` | string | no | Log level: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`. Default `"info"`. Shows filename and line number when set to `"debug"` |
 | `name` | string | yes | Rule name |
 | `type` | string | yes | `"direct"` |
 | `protocol` | string | yes | `"tcp"` / `"udp"` / `"all"` (forwards both TCP+UDP) |
@@ -209,6 +215,7 @@ A single client config can combine tunnel and direct rules; each runs independen
   "name": "Multi-Mode Client",
   "mode": "client",
   "check_update": true, // Check for updates on startup, omit or false to disable
+  "log_level": "info", // Log level: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
       "name": "cs2-tunnel", // Tunnel rule, requires server
@@ -263,8 +270,8 @@ Four transport combinations with different reliability guarantees:
 Set `"check_update": true` in your config file. On each startup the program queries the GitHub API for the latest release tag and compares it with the current version. If a newer version is available, a reminder is printed:
 
 ```
-2026/05/28 20:14:22 [Update] New version available: 1.0.0
-2026/05/28 20:14:22 [Update] Download: https://github.com/MarchSnow-1/PortRelay/releases
+[INFO]  2026/05/28 20:14:22 New version available: 1.0.0
+[INFO]  2026/05/28 20:14:22 Download: https://github.com/MarchSnow-1/PortRelay/releases
 ```
 
 Disabled by default — omit the field or set it to `false` and no network request is made at startup.

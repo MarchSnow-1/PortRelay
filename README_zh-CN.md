@@ -34,10 +34,10 @@ PortRelay 是一个 Go 语言编写的轻量级网络工具, 支持:
 
 ```bash
 # 服务端
-./portrelay --config server.json
+./portrelay --config-path server.json
 
 # 客户端
-./portrelay --config client.json
+./portrelay --config-path client.json
 
 # 内联配置（无需文件）
 ./portrelay --config-base64 <base64编码的JSON>
@@ -50,13 +50,13 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | 优先级 | CLI 参数 | 适用场景 |
 |--------|----------|----------|
 | 1 | `--config-base64 <base64>` | 脚本调用、容器部署、无文件环境 |
-| 2 | `--config <path>` | 指定配置文件路径 |
+| 2 | `--config-path <path>` | 指定配置文件路径 |
 | 3 | （无参数） | 自动读取程序同目录下的 `config.json` |
 
 ### 服务端
 
 > [!WARNING]
-> 如需复制配置文件，请删除注释
+> 如需复制配置文件, 请删除注释
 
 ```json
 {
@@ -64,6 +64,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
   "mode": "server", // 运行模式: server
   "admin_passwd": "", // 全局通用密码, 空字符串 = 禁用
   "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
+  "log_level": "info", // 日志级别: "debug" / "info" / "warn" / "error" / "fatal"
   "listen_port": "9000", // 统一入口端口, TCP 和 UDP 共用
   "listen_protocol": "all", // 监听的传输协议: "tcp" / "udp" / "all"
   "proxies": [
@@ -84,6 +85,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | `mode` | string | 是 | `"server"` |
 | `admin_passwd` | string | 否 | 全局通用密码, 空字符串 = 禁用 |
 | `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
+| `log_level` | string | 否 | 日志级别: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`, 默认 `"info"`,  `"debug"` 时显示文件名和行号 |
 | `listen_port` | string | 是 | 统一入口端口, 同时监听 TCP 和 UDP |
 | `listen_protocol` | string | 是 | 服务端监听的传输协议: `"tcp"` / `"udp"` / `"all"` |
 | `proxies[].name` | string | 是 | 隧道名称 (客户端需匹配) |
@@ -105,13 +107,14 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 ### 客户端 — 隧道模式
 
 > [!WARNING]
-> 如需复制配置文件，请删除注释
+> 如需复制配置文件, 请删除注释
 
 ```json
 {
   "name": "我的客户端", // 配置名称, 仅用于日志
   "mode": "client", // 运行模式: client
   "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
+  "log_level": "info", // 日志级别: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
       "name": "cs2-tunnel", // 隧道名称, 必须与服务端一致
@@ -129,6 +132,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
+| `log_level` | string | 否 | 日志级别: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`, 默认 `"info"`, `"debug"` 时显示文件名和行号 |
 | `name` | string | 是 | 必须与服务端隧道名称一致 |
 | `type` | string | 是 | `"tunnel"` |
 | `listen_protocol` | string | 是 | 本地监听协议: `"tcp"` / `"udp"` / `"all"` |
@@ -159,7 +163,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 ### 客户端 — 独立模式
 
 > [!WARNING]
-> 如需复制配置文件，请删除注释
+> 如需复制配置文件, 请删除注释
 
 无需服务端, 用于固定目标的 IPv4 ↔ IPv6 端口转发
 
@@ -168,6 +172,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
   "name": "单转发模式客户端",
   "mode": "client",
   "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
+  "log_level": "info", // 日志级别: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
       "name": "v4-to-v6-tcp", // 你的配置文件命名
@@ -183,6 +188,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
+| `log_level` | string | 否 | 日志级别: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`, 默认 `"info"`, `"debug"` 时显示文件名和行号 |
 | `name` | string | 是 | 规则名称 |
 | `type` | string | 是 | `"direct"` |
 | `protocol` | string | 是 | `"tcp"` / `"udp"` / `"all"`（同时转发 TCP+UDP）|
@@ -200,7 +206,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 ### 混合模式
 
 > [!WARNING]
-> 如需复制配置文件，请删除注释
+> 如需复制配置文件, 请删除注释
 
 同一客户端可同时包含隧道和独立模式规则, 各规则独立运行互不干扰: 
 
@@ -209,6 +215,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
   "name": "多模式客户端",
   "mode": "client",
   "check_update": true, // 启动时检查新版本, 不填或 false 则不检查
+  "log_level": "info", // 日志级别: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
       "name": "cs2-tunnel", // 隧道规则, 连接服务端
@@ -262,8 +269,8 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 在配置文件中设置 `"check_update": true` 后, 每次启动时程序会通过 GitHub API 获取最新 Release 版本号并与当前版本对比, 若有新版本将在终端打印提示:
 
 ```
-2026/05/28 20:14:22 [Update] New version available: 1.0.0
-2026/05/28 20:14:22 [Update] Download: https://github.com/MarchSnow-1/PortRelay/releases
+[INFO]  2026/05/28 20:14:22 New version available: 1.0.0
+[INFO]  2026/05/28 20:14:22 Download: https://github.com/MarchSnow-1/PortRelay/releases
 ```
 
 默认不启用, 不填写或设为 `false` 时启动不会发起任何网络请求
@@ -286,4 +293,4 @@ go build -o ../portrelay .
 
 ## 开源协议
 
-Apache 2.0 — 详见 [LICENSE](LICENSE)。
+Apache 2.0 — 详见 [LICENSE](LICENSE)
