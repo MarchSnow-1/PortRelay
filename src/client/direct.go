@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	logger "github.com/donnie4w/go-logger/logger"
 
 	"github.com/MarchSnow-1/PortRelay/config"
 )
@@ -29,8 +30,8 @@ func NewDirectClient(proxy *config.Proxy) *DirectClient {
 }
 
 func (d *DirectClient) Start() error {
-	log.Printf("[Direct \"%s\"] Starting %s forwarder: %s -> %s",
-		d.proxy.Name, d.proxy.Protocol, d.proxy.Listen, d.proxy.Target)
+	logger.Info("[\"", d.proxy.Name, "\"] Starting ", d.proxy.Protocol, " forwarder: ",
+		d.proxy.Listen, " -> ", d.proxy.Target)
 
 	switch d.proxy.Protocol {
 	case "tcp":
@@ -59,7 +60,7 @@ func (d *DirectClient) startTCP() error {
 	}
 	defer l.Close()
 
-	log.Printf("[Direct \"%s\"] TCP listener on %s", d.proxy.Name, d.proxy.Listen)
+	logger.Info("[\"", d.proxy.Name, "\"] TCP listener on ", d.proxy.Listen)
 
 	for {
 		select {
@@ -74,7 +75,7 @@ func (d *DirectClient) startTCP() error {
 			case <-d.ctx.Done():
 				return nil
 			default:
-				log.Printf("[Direct \"%s\"] TCP accept error: %v", d.proxy.Name, err)
+				logger.Error("[\"", d.proxy.Name, "\"] TCP accept error: ", err)
 				continue
 			}
 		}
@@ -90,7 +91,7 @@ func (d *DirectClient) handleTCPConn(localConn net.Conn) {
 
 	remoteConn, err := net.DialTimeout("tcp", d.proxy.Target, 10*time.Second)
 	if err != nil {
-		log.Printf("[Direct \"%s\"] Failed to connect to target %s: %v", d.proxy.Name, d.proxy.Target, err)
+		logger.Error("[\"", d.proxy.Name, "\"] Failed to connect to target ", d.proxy.Target, ": ", err)
 		return
 	}
 	defer remoteConn.Close()
@@ -123,7 +124,7 @@ func (d *DirectClient) startUDP() error {
 	}
 	defer conn.Close()
 
-	log.Printf("[Direct \"%s\"] UDP listener on %s", d.proxy.Name, d.proxy.Listen)
+	logger.Info("[\"", d.proxy.Name, "\"] UDP listener on ", d.proxy.Listen)
 
 	raddr, err := net.ResolveUDPAddr("udp", d.proxy.Target)
 	if err != nil {
@@ -148,7 +149,7 @@ func (d *DirectClient) startUDP() error {
 			case <-d.ctx.Done():
 				return nil
 			default:
-				log.Printf("[Direct \"%s\"] UDP read error: %v", d.proxy.Name, err)
+				logger.Error("[\"", d.proxy.Name, "\"] UDP read error: ", err)
 				continue
 			}
 		}
@@ -160,7 +161,7 @@ func (d *DirectClient) startUDP() error {
 		if !ok {
 			remoteConn, err := net.DialUDP("udp", nil, raddr)
 			if err != nil {
-				log.Printf("[Direct \"%s\"] Failed to dial target UDP: %v", d.proxy.Name, err)
+				logger.Error("[\"", d.proxy.Name, "\"] Failed to dial target UDP: ", err)
 				mu.Unlock()
 				continue
 			}

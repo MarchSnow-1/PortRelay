@@ -3,11 +3,12 @@ package client
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
+
+	logger "github.com/donnie4w/go-logger/logger"
 
 	"github.com/MarchSnow-1/PortRelay/config"
 	"github.com/MarchSnow-1/PortRelay/protocol"
@@ -45,9 +46,9 @@ type TunnelClient struct {
 }
 
 type localSession struct {
-	sessionID   uint32
-	remoteAddr  net.Addr
-	createdAt   time.Time
+	sessionID  uint32
+	remoteAddr net.Addr
+	createdAt  time.Time
 }
 
 func NewTunnelClient(proxy *config.Proxy) *TunnelClient {
@@ -76,7 +77,7 @@ func (c *TunnelClient) Start() error {
 			return fmt.Errorf("failed to listen UDP on %s: %w", c.proxy.ListenLocal, err)
 		}
 		c.udpConn = conn
-		log.Printf("[Tunnel \"%s\"] Local UDP listener on %s", c.proxy.Name, c.proxy.ListenLocal)
+		logger.Info("[\"", c.proxy.Name, "\"] Local UDP listener on ", c.proxy.ListenLocal)
 	}
 
 	if needTCP {
@@ -85,11 +86,11 @@ func (c *TunnelClient) Start() error {
 			return fmt.Errorf("failed to listen TCP on %s: %w", c.proxy.ListenLocal, err)
 		}
 		c.tcpListener = l
-		log.Printf("[Tunnel \"%s\"] Local TCP listener on %s", c.proxy.Name, c.proxy.ListenLocal)
+		logger.Info("[\"", c.proxy.Name, "\"] Local TCP listener on ", c.proxy.ListenLocal)
 	}
 
-	log.Printf("[Tunnel \"%s\"] Listen protocol: %s | Transport: %s | Server: %s",
-		c.proxy.Name, c.proxy.ListenProtocol, c.proxy.Transport, c.proxy.ServerIP)
+	logger.Info("[\"", c.proxy.Name, "\"] Listen protocol: ", c.proxy.ListenProtocol,
+		" | Transport: ", c.proxy.Transport, " | Server: ", c.proxy.ServerIP)
 
 	return c.connectAndRelay()
 }
@@ -116,7 +117,7 @@ func (c *TunnelClient) connectAndRelay() error {
 		}
 
 		if err := c.connect(); err != nil {
-			log.Printf("[Tunnel \"%s\"] Connection failed: %v, retrying in %v...", c.proxy.Name, err, c.reconnectInterval)
+			logger.Error("[\"", c.proxy.Name, "\"] Connection failed: ", err, ", retrying in ", c.reconnectInterval, "...")
 			select {
 			case <-c.ctx.Done():
 				return nil
@@ -133,8 +134,8 @@ func (c *TunnelClient) connectAndRelay() error {
 		if c.transportType == protocol.TransportUDP {
 			transportName = "UDP"
 		}
-		log.Printf("[Tunnel \"%s\"] Connected | server=%s | transport=%s | listen=%s",
-			c.proxy.Name, c.proxy.ServerIP, transportName, c.proxy.ListenProtocol)
+		logger.Info("[\"", c.proxy.Name, "\"] Connected | server=", c.proxy.ServerIP,
+			" | transport=", transportName, " | listen=", c.proxy.ListenProtocol)
 
 		// Start local listeners
 		if c.udpConn != nil {
@@ -150,7 +151,7 @@ func (c *TunnelClient) connectAndRelay() error {
 		c.readFromTransport()
 
 		// Connection lost - clean up for reconnect
-		log.Printf("[Tunnel \"%s\"] Transport connection lost, reconnecting...", c.proxy.Name)
+		logger.Warn("[\"", c.proxy.Name, "\"] Transport connection lost, reconnecting...")
 
 		c.reconnectMu.Lock()
 		c.reconnecting = true
@@ -209,7 +210,7 @@ func (c *TunnelClient) connect() error {
 tryUDP:
 	if preferUDP || transportProto == "auto" || preferTCP {
 		if preferTCP {
-			log.Printf("[Tunnel \"%s\"] Warning: TCP transport failed, falling back to UDP", c.proxy.Name)
+			logger.Warn("[\"", c.proxy.Name, "\"] TCP transport failed, falling back to UDP")
 		}
 
 		// Try UDP transport
@@ -274,7 +275,7 @@ tryUDP:
 }
 
 func (c *TunnelClient) connectKCP() error {
-	log.Printf("[Tunnel \"%s\"] Establishing KCP connection (TCP-in-UDP mode)", c.proxy.Name)
+	logger.Info("[\"", c.proxy.Name, "\"] Establishing KCP connection (TCP-in-UDP mode)")
 
 	kcpConn, err := transport.DialKCP(c.proxy.ServerIP)
 	if err != nil {
@@ -302,7 +303,7 @@ func (c *TunnelClient) handleLocalUDP() {
 			reconnecting := c.reconnecting
 			c.reconnectMu.Unlock()
 			if !reconnecting {
-				log.Printf("[Tunnel \"%s\"] Local UDP read error: %v", c.proxy.Name, err)
+				logger.Error("[\"", c.proxy.Name, "\"] Local UDP read error: ", err)
 			}
 			continue
 		}
@@ -339,7 +340,7 @@ func (c *TunnelClient) handleLocalTCP() {
 			case <-c.ctx.Done():
 				return
 			default:
-				log.Printf("[Tunnel \"%s\"] Local TCP accept error: %v", c.proxy.Name, err)
+				logger.Error("[\"", c.proxy.Name, "\"] Local TCP accept error: ", err)
 				continue
 			}
 		}
@@ -375,8 +376,8 @@ func (c *TunnelClient) handleLocalTCPConn(conn net.Conn, sessionID uint32) {
 	if c.transportType == protocol.TransportUDP {
 		transportName = "UDP"
 	}
-	log.Printf("[Tunnel \"%s\"] New session | id=0x%08X | mode=TCP-in-%s | from=%s",
-		c.proxy.Name, sessionID, transportName, conn.RemoteAddr().String())
+	logger.Info("[\"", c.proxy.Name, "\"] New session | id=0x", fmt.Sprintf("%08X", sessionID),
+		" | mode=TCP-in-", transportName, " | from=", conn.RemoteAddr().String())
 
 	buf := make([]byte, 65535)
 	for {
@@ -422,7 +423,7 @@ func (c *TunnelClient) readFromTransport() {
 			}
 			frame, err := protocol.ParseFrameFromDatagram(buf[:n])
 			if err != nil {
-				log.Printf("[Tunnel \"%s\"] Failed to parse UDP frame: %v", c.proxy.Name, err)
+				logger.Error("[\"", c.proxy.Name, "\"] Failed to parse UDP frame: ", err)
 				continue
 			}
 			c.processIncomingFrame(frame)
@@ -435,7 +436,7 @@ func (c *TunnelClient) processIncomingFrame(frame *protocol.Frame) {
 	case protocol.FrameData:
 		d, err := protocol.DecodeData(frame.Payload)
 		if err != nil {
-			log.Printf("[Tunnel \"%s\"] Failed to decode data: %v", c.proxy.Name, err)
+			logger.Error("[\"", c.proxy.Name, "\"] Failed to decode data: ", err)
 			return
 		}
 		c.deliverToLocal(d)
@@ -445,7 +446,7 @@ func (c *TunnelClient) processIncomingFrame(frame *protocol.Frame) {
 		if err != nil {
 			return
 		}
-		log.Printf("[Tunnel \"%s\"] Close frame: session=%d reason=%d", c.proxy.Name, cf.SessionID, cf.Reason)
+		logger.Info("[\"", c.proxy.Name, "\"] Close frame: session=", cf.SessionID, " reason=", cf.Reason)
 		c.removeSession(cf.SessionID)
 	}
 }
@@ -525,8 +526,8 @@ func (c *TunnelClient) getOrCreateSession(addr net.Addr) uint32 {
 	if c.transportType == protocol.TransportUDP {
 		transportName = "UDP"
 	}
-	log.Printf("[Tunnel \"%s\"] New session | id=0x%08X | mode=UDP-in-%s | from=%s",
-		c.proxy.Name, sessionID, transportName, addr.String())
+	logger.Info("[\"", c.proxy.Name, "\"] New session | id=0x", fmt.Sprintf("%08X", sessionID),
+		" | mode=UDP-in-", transportName, " | from=", addr.String())
 
 	return sessionID
 }

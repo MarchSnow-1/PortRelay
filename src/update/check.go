@@ -2,15 +2,16 @@ package update
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	logger "github.com/donnie4w/go-logger/logger"
 )
 
 const (
-	repoOwner  = "MarchSnow-1"
-	repoName   = "PortRelay"
+	repoOwner   = "MarchSnow-1"
+	repoName    = "PortRelay"
 	releasesURL = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 	repoURL     = "https://github.com/" + repoOwner + "/" + repoName
 )
@@ -53,7 +54,7 @@ func CheckForUpdate(currentVersion string) {
 	current := strings.TrimPrefix(currentVersion, "v")
 
 	if latest != current {
-		log.Printf("[Update] New version available: %s (current: %s)", latest, currentVersion)
-		log.Printf("[Update] Download: %s/releases", repoURL)
+		logger.Info("New version available: ", latest, " (current: ", currentVersion, ")")
+		logger.Info("Download: ", repoURL, "/releases")
 	}
 }

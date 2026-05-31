@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	logger "github.com/donnie4w/go-logger/logger"
 
 	"github.com/MarchSnow-1/PortRelay/client"
 	"github.com/MarchSnow-1/PortRelay/config"
@@ -17,8 +18,54 @@ import (
 // Set via -ldflags at build time.
 var version = "dev"
 
+func initLogger(level string) {
+	logLevel := logger.LEVEL_INFO
+	switch level {
+	case "debug":
+		logLevel = logger.LEVEL_DEBUG
+	case "warn":
+		logLevel = logger.LEVEL_WARN
+	case "error":
+		logLevel = logger.LEVEL_ERROR
+	case "fatal":
+		logLevel = logger.LEVEL_FATAL
+	}
+
+	levelFmt := func(level logger.LEVELTYPE) string {
+		switch level {
+		case logger.LEVEL_DEBUG:
+			return "[DEBUG]"
+		case logger.LEVEL_INFO:
+			return "[INFO] "
+		case logger.LEVEL_WARN:
+			return "[WARN] "
+		case logger.LEVEL_ERROR:
+			return "[ERROR]"
+		case logger.LEVEL_FATAL:
+			return "[FATAL]"
+		default:
+			return "[?????]"
+		}
+	}
+
+	format := logger.FORMAT_LEVELFLAG | logger.FORMAT_DATE | logger.FORMAT_TIME
+	formatter := "{level} {time} {message}\n"
+	if level == "debug" {
+		format |= logger.FORMAT_SHORTFILENAME
+		formatter = "{level} {time} {file} {message}\n"
+	}
+
+	logger.SetOption(&logger.Option{
+		Level:      logLevel,
+		Console:    true,
+		Format:     format,
+		Formatter:  formatter,
+		AttrFormat: &logger.AttrFormat{SetLevelFmt: levelFmt},
+	})
+}
+
 func main() {
-	configPath := flag.String("config", "", "Path to configuration file")
+	configPath := flag.String("config-path", "", "Path to configuration file")
 	configBase64 := flag.String("config-base64", "", "Base64-encoded configuration JSON")
 	flag.Parse()
 
@@ -37,10 +84,17 @@ func main() {
 
 	cfg, err := config.LoadConfig(loadMode, loadValue)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		fmt.Printf("[FATAL] Failed to load configuration: %v\n", err)
+		os.Exit(1)
 	}
 
-	log.Printf("PortRelay starting: name=\"%s\" mode=%s proxies=%d version=%s", cfg.Name, cfg.Mode, len(cfg.Proxies), version)
+	logLevel := cfg.LogLevel
+	if logLevel == "" {
+		logLevel = "info"
+	}
+	initLogger(logLevel)
+
+	logger.Info("PortRelay starting: name=\"", cfg.Name, "\" mode=", cfg.Mode, " proxies=", len(cfg.Proxies), " version=", version)
 
 	if cfg.CheckUpdate {
 		update.CheckForUpdate(version)
@@ -55,7 +109,7 @@ func main() {
 	case "client":
 		runClient(cfg, sigCh)
 	default:
-		log.Fatalf("Unknown mode: %s", cfg.Mode)
+		logger.Fatal("Unknown mode: ", cfg.Mode)
 	}
 }
 
@@ -69,15 +123,15 @@ func runServer(cfg *config.Config, sigCh chan os.Signal) {
 
 	select {
 	case <-sigCh:
-		log.Println("Shutting down server...")
+		logger.Info("Shutting down server...")
 		srv.Shutdown()
 	case err := <-errCh:
 		if err != nil {
-			log.Fatalf("Server error: %v", err)
+			logger.Fatal("Server error: ", err)
 		}
 	}
 
-	log.Println("Server stopped")
+	logger.Info("Server stopped")
 }
 
 func runClient(cfg *config.Config, sigCh chan os.Signal) {
@@ -89,7 +143,7 @@ func runClient(cfg *config.Config, sigCh chan os.Signal) {
 
 		if proxy.Type == "direct" {
 			if cfg.Mode != "client" {
-				log.Printf("Warning: skipping direct proxy \"%s\" in non-client mode", proxy.Name)
+				logger.Warn("Skipping direct proxy \"", proxy.Name, "\" in non-client mode")
 				continue
 			}
 			dc := client.NewDirectClient(proxy)
@@ -109,21 +163,20 @@ func runClient(cfg *config.Config, sigCh chan os.Signal) {
 					}
 				}()
 			}
-			// Server tunnel proxies are handled by the server
 		}
 	}
 
 	select {
 	case <-sigCh:
-		log.Println("Shutting down client...")
+		logger.Info("Shutting down client...")
 		for _, c := range clients {
 			c.Stop()
 		}
 	case err := <-errCh:
 		if err != nil {
-			log.Fatalf("Client error: %v", err)
+			logger.Fatal("Client error: ", err)
 		}
 	}
 
-	log.Println("Client stopped")
+	logger.Info("Client stopped")
 }

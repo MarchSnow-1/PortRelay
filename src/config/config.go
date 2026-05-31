@@ -17,6 +17,7 @@ type Config struct {
 	ListenPort     string  `json:"listen_port,omitempty"`
 	ListenProtocol string  `json:"listen_protocol,omitempty"`
 	CheckUpdate    bool    `json:"check_update,omitempty"`
+	LogLevel       string  `json:"log_level,omitempty"` // "debug", "info", "warn", "error", "fatal"
 }
 
 type Proxy struct {

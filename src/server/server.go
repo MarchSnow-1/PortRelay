@@ -3,10 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
+
+	logger "github.com/donnie4w/go-logger/logger"
 
 	"github.com/MarchSnow-1/PortRelay/config"
 	"github.com/MarchSnow-1/PortRelay/protocol"
@@ -101,7 +102,7 @@ func (s *Server) Start() error {
 			return fmt.Errorf("failed to listen TCP on port %s: %w", s.cfg.ListenPort, err)
 		}
 		s.tcpListener = l
-		log.Printf("[Server] TCP listener started on :%s", s.cfg.ListenPort)
+		logger.Info("TCP listener started on :", s.cfg.ListenPort)
 	}
 
 	if needUDP {
@@ -114,18 +115,18 @@ func (s *Server) Start() error {
 			return fmt.Errorf("failed to listen UDP on port %s: %w", s.cfg.ListenPort, err)
 		}
 		s.udpConn = conn
-		log.Printf("[Server] UDP listener started on :%s", s.cfg.ListenPort)
+		logger.Info("UDP listener started on :", s.cfg.ListenPort)
 	}
 
-	log.Printf("[Server] ========================================")
-	log.Printf("[Server] Config       : \"%s\"", s.cfg.Name)
-	log.Printf("[Server] Listen port  : %s", s.cfg.ListenPort)
-	log.Printf("[Server] Transport    : %s", s.cfg.ListenProtocol)
-	log.Printf("[Server] Tunnels      : %d", len(s.tunnels))
+	logger.Info("========================================")
+	logger.Info("Config       : \"", s.cfg.Name, "\"")
+	logger.Info("Listen port  : ", s.cfg.ListenPort)
+	logger.Info("Transport    : ", s.cfg.ListenProtocol)
+	logger.Info("Tunnels      : ", len(s.tunnels))
 	for name, t := range s.tunnels {
-		log.Printf("[Server]   - \"%s\" → %s (inner: %s)", name, t.ServiceTarget, t.AllowProtocol)
+		logger.Info("  - \"", name, "\" -> ", t.ServiceTarget, " (inner: ", t.AllowProtocol, ")")
 	}
-	log.Printf("[Server] ========================================")
+	logger.Info("========================================")
 
 	if s.tcpListener != nil {
 		s.wg.Add(1)
@@ -181,7 +182,7 @@ func (s *Server) acceptTCP() {
 			case <-s.ctx.Done():
 				return
 			default:
-				log.Printf("[Server] TCP accept error: %v", err)
+				logger.Error("TCP accept error: ", err)
 				continue
 			}
 		}
@@ -196,15 +197,15 @@ func (s *Server) handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
 
 	remoteAddr := conn.RemoteAddr().String()
-	log.Printf("[Server] TCP transport connection from %s", remoteAddr)
+	logger.Info("TCP transport connection from ", remoteAddr)
 
 	h, err := s.processHandshake(conn, conn)
 	if err != nil {
-		log.Printf("[Server] Handshake failed from %s: %v", remoteAddr, err)
+		logger.Error("Handshake failed from ", remoteAddr, ": ", err)
 		return
 	}
 
-	log.Printf("[Server] [%s] Tunnel established | from=%s | transport=TCP", h.TunnelName, remoteAddr)
+	logger.Info("[", h.TunnelName, "] Tunnel established | from=", remoteAddr, " | transport=TCP")
 
 	s.processFrames(conn, conn, h.Tunnel)
 }
@@ -226,7 +227,7 @@ func (s *Server) handleUDP() {
 			case <-s.ctx.Done():
 				return
 			default:
-				log.Printf("[Server] UDP read error: %v", err)
+				logger.Error("UDP read error: ", err)
 				continue
 			}
 		}
@@ -245,7 +246,7 @@ func (s *Server) handleUDP() {
 func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 	frame, err := protocol.ParseFrameFromDatagram(data)
 	if err != nil {
-		log.Printf("[Server] Failed to parse UDP frame from %s: %v", addr, err)
+		logger.Error("Failed to parse UDP frame from ", addr, ": ", err)
 		return
 	}
 
@@ -254,7 +255,7 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 	if frame.Type == protocol.FrameHandshake {
 		h, err := protocol.DecodeHandshake(frame.Payload)
 		if err != nil {
-			log.Printf("[Server] Failed to decode handshake from %s: %v", addr, err)
+			logger.Error("Failed to decode handshake from ", addr, ": ", err)
 			return
 		}
 
@@ -270,7 +271,7 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 			case protocol.StatusTunnelNotFound:
 				statusName = "Tunnel Not Found"
 			}
-			log.Printf("[Server] Auth failed | from=%s | tunnel=%s | reason=%s", addr, h.TunnelName, statusName)
+			logger.Error("Auth failed | from=", addr, " | tunnel=", h.TunnelName, " | reason=", statusName)
 			return
 		}
 
@@ -303,8 +304,7 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 		if ackProto == protocol.TransportTCP {
 			protoName = "KCP(TCP-in-UDP)"
 		}
-		log.Printf("[Server] [%s] Handshake OK | from=%s | transport=%s",
-			h.TunnelName, addr, protoName)
+		logger.Info("[", h.TunnelName, "] Handshake OK | from=", addr, " | transport=", protoName)
 
 		if acceptedProto == protocol.TransportUDP || acceptedProto == protocol.TransportAuto {
 			s.udpClientsMu.Lock()
@@ -323,13 +323,13 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 		client, ok := s.udpClients[clientKey]
 		s.udpClientsMu.RUnlock()
 		if !ok {
-			log.Printf("[Server] Data frame from unauthenticated client %s", addr)
+			logger.Warn("Data frame from unauthenticated client ", addr)
 			return
 		}
 
 		d, err := protocol.DecodeData(frame.Payload)
 		if err != nil {
-			log.Printf("[Server] Failed to decode data from %s: %v", addr, err)
+			logger.Error("Failed to decode data from ", addr, ": ", err)
 			return
 		}
 
@@ -355,7 +355,7 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 			s.udpClientsMu.Lock()
 			delete(s.udpClients, clientKey)
 			s.udpClientsMu.Unlock()
-			log.Printf("[Server] [%s] Tunnel closed from %s", client.tunnel.Name, addr)
+			logger.Info("[", client.tunnel.Name, "] Tunnel closed from ", addr)
 		}
 		return
 	}
@@ -391,8 +391,7 @@ func (s *Server) handleKCPPacket(data []byte, addr net.Addr) {
 		}
 		s.kcpSessions[convID] = ks
 
-		log.Printf("[Server] [%s] KCP session (TCP-in-UDP) established | conv=%d | from=%s",
-			pending.tunnel.Name, convID, addr)
+		logger.Info("[", pending.tunnel.Name, "] KCP session (TCP-in-UDP) established | conv=", convID, " | from=", addr)
 
 		s.wg.Add(1)
 		go s.handleKCPSession(ks)
@@ -421,7 +420,7 @@ func (s *Server) handleKCPSession(ks *kcpServerSession) {
 		frame, err := protocol.ReadFrame(ks.kcpConn)
 		if err != nil {
 			if !ks.kcpConn.IsClosed() {
-				log.Printf("[Server] KCP frame read error (conv=%d): %v", ks.kcpConn.ConvID(), err)
+				logger.Error("KCP frame read error (conv=", ks.kcpConn.ConvID(), "): ", err)
 			}
 			return
 		}
@@ -429,7 +428,7 @@ func (s *Server) handleKCPSession(ks *kcpServerSession) {
 		if frame.Type == protocol.FrameData {
 			d, err := protocol.DecodeData(frame.Payload)
 			if err != nil {
-				log.Printf("[Server] Failed to decode KCP data: %v", err)
+				logger.Error("Failed to decode KCP data: ", err)
 				continue
 			}
 			s.forwardData(ks.tunnel, d, ks.addr, ks.kcpConn)
@@ -515,7 +514,7 @@ func (s *Server) processFrames(reader ioReader, writer net.Conn, tunnel *config.
 
 		frame, err := protocol.ReadFrame(reader)
 		if err != nil {
-			log.Printf("[Server] [%s] Frame read error: %v", tunnel.Name, err)
+			logger.Info("[", tunnel.Name, "] Frame read error: ", err)
 			return
 		}
 
@@ -523,7 +522,7 @@ func (s *Server) processFrames(reader ioReader, writer net.Conn, tunnel *config.
 		case protocol.FrameData:
 			d, err := protocol.DecodeData(frame.Payload)
 			if err != nil {
-				log.Printf("[Server] Failed to decode data: %v", err)
+				logger.Error("Failed to decode data: ", err)
 				continue
 			}
 			s.forwardData(tunnel, d, nil, writer)
@@ -539,7 +538,7 @@ func (s *Server) processFrames(reader ioReader, writer net.Conn, tunnel *config.
 			}
 
 		default:
-			log.Printf("[Server] Unknown frame type 0x%02x", frame.Type)
+			logger.Warn("Unknown frame type 0x", fmt.Sprintf("%02x", frame.Type))
 		}
 	}
 }
@@ -557,7 +556,7 @@ func (s *Server) forwardData(tunnel *config.Proxy, d *protocol.Data, clientAddr 
 	if !ok {
 		svcConn, err := s.getServiceConn(tunnel, d.InnerProto)
 		if err != nil {
-			log.Printf("[Server] [%s] Failed to connect to %s: %v", tunnel.Name, tunnel.ServiceTarget, err)
+			logger.Error("[", tunnel.Name, "] Failed to connect to ", tunnel.ServiceTarget, ": ", err)
 			s.sessionsMu.Unlock()
 			s.sendClose(clientConn, clientAddr, d.SessionID, protocol.CloseTargetUnreachable)
 			return
@@ -583,8 +582,8 @@ func (s *Server) forwardData(tunnel *config.Proxy, d *protocol.Data, clientAddr 
 		if d.InnerProto == protocol.InnerProtoTCP {
 			innerName = "TCP"
 		}
-		log.Printf("[Server] [%s] New session | id=0x%08X | mode=%s-in-%s | target=%s",
-			tunnel.Name, d.SessionID, innerName, transportName, tunnel.ServiceTarget)
+		logger.Info("[", tunnel.Name, "] New session | id=0x", fmt.Sprintf("%08X", d.SessionID),
+			" | mode=", innerName, "-in-", transportName, " | target=", tunnel.ServiceTarget)
 
 		s.wg.Add(1)
 		go s.readFromService(ss)
@@ -593,7 +592,7 @@ func (s *Server) forwardData(tunnel *config.Proxy, d *protocol.Data, clientAddr 
 
 	if ss.svcConn != nil && len(d.InnerPayload) > 0 {
 		if _, err := ss.svcConn.Write(d.InnerPayload); err != nil {
-			log.Printf("[Server] [%s] Write to %s failed: %v", tunnel.Name, tunnel.ServiceTarget, err)
+			logger.Error("[", tunnel.Name, "] Write to ", tunnel.ServiceTarget, " failed: ", err)
 		}
 	}
 }
@@ -672,7 +671,7 @@ func (s *Server) handleCloseFrame(cf *protocol.CloseFrame) {
 		case protocol.CloseProtocolError:
 			reasonName = "Protocol Error"
 		}
-		log.Printf("[Server] [%s] Session closed | id=0x%08X | reason=%s", ss.tunnelName, cf.SessionID, reasonName)
+		logger.Info("[", ss.tunnelName, "] Session closed | id=0x", fmt.Sprintf("%08X", cf.SessionID), " | reason=", reasonName)
 	}
 }
 
