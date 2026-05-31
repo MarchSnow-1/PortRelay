@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"portrelay/client"
-	"portrelay/config"
-	"portrelay/server"
-	"portrelay/update"
+	"github.com/MarchSnow-1/PortRelay/client"
+	"github.com/MarchSnow-1/PortRelay/config"
+	"github.com/MarchSnow-1/PortRelay/server"
+	"github.com/MarchSnow-1/PortRelay/update"
 )
 
 // Set via -ldflags at build time.

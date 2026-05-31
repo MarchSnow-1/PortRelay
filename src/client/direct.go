@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"portrelay/config"
+	"github.com/MarchSnow-1/PortRelay/config"
 )
 
 type DirectClient struct {

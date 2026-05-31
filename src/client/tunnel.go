@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"portrelay/config"
-	"portrelay/protocol"
-	"portrelay/transport"
+	"github.com/MarchSnow-1/PortRelay/config"
+	"github.com/MarchSnow-1/PortRelay/protocol"
+	"github.com/MarchSnow-1/PortRelay/transport"
 )
 
 type TunnelClient struct {
