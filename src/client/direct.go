@@ -206,6 +206,10 @@ func (d *DirectClient) handleUDPResponses(localConn *net.UDPConn, remoteConn *ne
 		remoteConn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		n, _, err := remoteConn.ReadFrom(buf)
 		if err != nil {
+			// Distinguish timeout from real errors
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				logger.Debug("UDP session timeout for ", clientKey)
+			}
 			return
 		}
 

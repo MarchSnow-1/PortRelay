@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -311,6 +310,15 @@ func (c *TunnelClient) handleLocalUDP() {
 		data := make([]byte, n)
 		copy(data, buf[:n])
 
+		// UDP datagrams are atomic and cannot be split; drop oversized ones
+		// locally rather than sending a frame the server will reject (which
+		// would kill the whole TCP transport).
+		maxChunk := protocol.MaxFramePayloadSize - 5 // subtract Data header
+		if len(data) > maxChunk {
+			logger.Warn("[\"", c.proxy.Name, "\"] Dropping oversized UDP datagram (", len(data), " bytes, limit ", maxChunk, ") from ", remoteAddr)
+			continue
+		}
+
 		sessionID := c.getOrCreateSession(remoteAddr)
 
 		d := &protocol.Data{
@@ -345,14 +353,55 @@ func (c *TunnelClient) handleLocalTCP() {
 			}
 		}
 
-		sessionID := rand.Uint32()
-		if sessionID == 0 {
-			sessionID = 1
-		}
+		sessionID := c.generateUniqueSessionID()
 
 		c.wg.Add(1)
 		go c.handleLocalTCPConn(conn, sessionID)
 	}
+}
+
+// generateUniqueSessionID generates a unique SessionID avoiding collisions
+// across both tcpConns and sessions maps. Safe to call without holding any lock.
+func (c *TunnelClient) generateUniqueSessionID() uint32 {
+	c.sessionsMu.RLock()
+	defer c.sessionsMu.RUnlock()
+	return c.uniqueSessionIDInLock()
+}
+
+// uniqueSessionIDInLock generates a unique SessionID. Caller must hold
+// sessionsMu in any mode (RLock or Lock).
+func (c *TunnelClient) uniqueSessionIDInLock() uint32 {
+	const maxRetries = 100
+
+	for i := 0; i < maxRetries; i++ {
+		sessionID := protocol.SecureSessionID()
+
+		// Check tcpConns (direct key lookup)
+		c.tcpConnsMu.RLock()
+		_, existsInTCP := c.tcpConns[sessionID]
+		c.tcpConnsMu.RUnlock()
+
+		if existsInTCP {
+			continue
+		}
+
+		// Check sessions (caller holds the lock; iterate values directly)
+		existsInUDP := false
+		for _, sess := range c.sessions {
+			if sess.sessionID == sessionID {
+				existsInUDP = true
+				break
+			}
+		}
+
+		if !existsInUDP {
+			return sessionID
+		}
+	}
+
+	// Extremely low probability fallback: use timestamp
+	logger.Warn("Failed to generate unique sessionID after ", maxRetries, " retries, using timestamp fallback")
+	return uint32(time.Now().UnixNano()&0xFFFFFFFE) | 1 // ensure non-zero
 }
 
 func (c *TunnelClient) handleLocalTCPConn(conn net.Conn, sessionID uint32) {
@@ -380,6 +429,8 @@ func (c *TunnelClient) handleLocalTCPConn(conn net.Conn, sessionID uint32) {
 		" | mode=TCP-in-", transportName, " | from=", conn.RemoteAddr().String())
 
 	buf := make([]byte, 65535)
+	maxChunk := protocol.MaxFramePayloadSize - 5 // subtract Data header
+
 	for {
 		select {
 		case <-c.ctx.Done():
@@ -392,13 +443,24 @@ func (c *TunnelClient) handleLocalTCPConn(conn net.Conn, sessionID uint32) {
 			return
 		}
 
-		d := &protocol.Data{
-			SessionID:    sessionID,
-			InnerProto:   protocol.InnerProtoTCP,
-			InnerPayload: buf[:n],
+		// Chunk large data into multiple frames
+		payload := buf[:n]
+		for len(payload) > 0 {
+			chunkSize := len(payload)
+			if chunkSize > maxChunk {
+				chunkSize = maxChunk
+			}
+
+			d := &protocol.Data{
+				SessionID:    sessionID,
+				InnerProto:   protocol.InnerProtoTCP,
+				InnerPayload: payload[:chunkSize],
+			}
+			f := &protocol.Frame{Type: protocol.FrameData, Payload: protocol.EncodeData(d)}
+			c.sendToTransport(f)
+
+			payload = payload[chunkSize:]
 		}
-		f := &protocol.Frame{Type: protocol.FrameData, Payload: protocol.EncodeData(d)}
-		c.sendToTransport(f)
 	}
 }
 
@@ -511,10 +573,8 @@ func (c *TunnelClient) getOrCreateSession(addr net.Addr) uint32 {
 		return sess.sessionID
 	}
 
-	sessionID := rand.Uint32()
-	if sessionID == 0 {
-		sessionID = 1
-	}
+	// Caller already holds sessionsMu (write lock); use the locked variant
+	sessionID := c.uniqueSessionIDInLock()
 
 	c.sessions[key] = &localSession{
 		sessionID:  sessionID,
