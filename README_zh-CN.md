@@ -49,7 +49,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 
 | 优先级 | CLI 参数 | 适用场景 |
 |--------|----------|----------|
-| 1 | `--config-base64 <base64>` | 脚本调用、容器部署、无文件环境 |
+| 1 | `--config-base64 <base64>` | 脚本调用、容器部署、无文件环境, 使用 **标准 Base64 编码**(非 URL-safe) |
 | 2 | `--config-path <path>` | 指定配置文件路径 |
 | 3 | （无参数） | 自动读取程序同目录下的 `config.json` |
 
@@ -88,6 +88,11 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | `log_level` | string | 否 | 日志级别: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`, 默认 `"info"`,  `"debug"` 时显示文件名和行号 |
 | `listen_port` | string | 是 | 统一入口端口, 同时监听 TCP 和 UDP |
 | `listen_protocol` | string | 是 | 服务端监听的传输协议: `"tcp"` / `"udp"` / `"all"` |
+| `max_frame_size` | int | 否 | 最大帧载荷大小(字节), 默认 `32768`(32KB), 范围: 1024-65535, **服务端和客户端必须使用相同的值** |
+
+> [!NOTE]
+> `max_frame_size` 同样适用于 UDP 数据报：超过该限制的单个 UDP 数据报会被丢弃 (UDP 数据报无法拆分), TCP 流会被透明地拆分为多个帧
+| `max_connections` | int | 否 | 最大并发连接数 (仅服务端), 默认 `1000`, 包括 TCP、UDP 和 KCP 连接, 空闲连接会在 10 分钟后自动清理 |
 | `proxies[].name` | string | 是 | 隧道名称 (客户端需匹配) |
 | `proxies[].type` | string | 是 | `"tunnel"` |
 | `proxies[].service_target` | string | 是 | 转发到的目标 `ip:port` |
@@ -133,6 +138,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 |------|------|------|------|
 | `check_update` | bool | 否 | 启动时检查是否有新版本可用, 默认 `false` |
 | `log_level` | string | 否 | 日志级别: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`, 默认 `"info"`, `"debug"` 时显示文件名和行号 |
+| `max_frame_size` | int | 否 | 最大帧载荷大小(字节), 默认 `32768`(32KB), **必须与服务端配置一致** |
 | `name` | string | 是 | 必须与服务端隧道名称一致 |
 | `type` | string | 是 | `"tunnel"` |
 | `listen_protocol` | string | 是 | 本地监听协议: `"tcp"` / `"udp"` / `"all"` |
@@ -147,7 +153,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 |----|------|
 | `"tcp"` | 强制 TCP, 服务端不支持时自动 fallback（打印 warning） |
 | `"udp"` | 强制 UDP, 同上 fallback 逻辑 |
-| `"auto"` | 优先匹配 `listen_protocol` 相同的协议；否则选另一种 |
+| `"auto"` | 总是先尝试 TCP，TCP 连接失败时回退到 UDP。与 `listen_protocol` 无关。 |
 
 **连接始终建立, 不会因协议不匹配而退出**
 
@@ -263,6 +269,19 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
 | TCP in UDP | TCP | UDP | Stop-and-Wait ARQ | [kcp-go](https://github.com/xtaci/kcp-go) |
 
 **UDP in TCP 断线重连**: TCP 隧道断开后客户端自动重连, 无限次重试, 服务端将每次重连视为新连接
+
+### KCP (TCP-in-UDP) 协商
+
+KCP 模式会在以下情况自动触发: 
+
+1. 客户端配置 `transport: "tcp"` 或 `"auto"`
+2. 服务端仅监听 UDP (`listen_protocol: "udp"`)
+3. 客户端 TCP 连接尝试失败
+4. 客户端转而发送 UDP 握手
+5. 服务端在握手 ACK 中返回 `AcceptedProto = TransportTCP`
+6. 客户端通过 UDP 建立 KCP 连接
+
+**结果**：在 UDP 传输层上获得 TCP 类似的可靠性，使用 [kcp-go](https://github.com/xtaci/kcp-go) 协议进行重传和拥塞控制
 
 ## 检查更新
 

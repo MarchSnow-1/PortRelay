@@ -49,7 +49,7 @@ PortRelay supports three config loading modes (priority high to low):
 
 | Priority | CLI flag | Use case |
 |----------|----------|----------|
-| 1 | `--config-base64 <base64>` | Scripts, containers, no filesystem |
+| 1 | `--config-base64 <base64>` | Scripts, containers, no filesystem. Use **standard Base64 encoding** (not URL-safe). |
 | 2 | `--config-path <path>` | Custom config path |
 | 3 | *(none)* | Reads `config.json` alongside the binary |
 
@@ -88,6 +88,11 @@ PortRelay supports three config loading modes (priority high to low):
 | `log_level` | string | no | Log level: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`. Default `"info"`. Shows filename and line number when set to `"debug"` |
 | `listen_port` | string | yes | Single port for both TCP and UDP |
 | `listen_protocol` | string | yes | Transport protocol to listen on: `"tcp"` / `"udp"` / `"all"` |
+| `max_frame_size` | int | no | Maximum frame payload size in bytes. Default `32768` (32KB). Range: 1024-65535. **Both server and client must use the same value.** |
+
+> [!NOTE]
+> `max_frame_size` also applies to UDP datagrams: a single UDP datagram larger than this limit is dropped (UDP datagrams cannot be split). TCP streams are transparently chunked into multiple frames.
+| `max_connections` | int | no | Maximum concurrent connections (server only). Default `1000`. Includes TCP, UDP, and KCP connections. Idle connections are automatically cleaned up after 10 minutes. |
 | `proxies[].name` | string | yes | Tunnel name (client must match) |
 | `proxies[].type` | string | yes | `"tunnel"` |
 | `proxies[].service_target` | string | yes | Forward target `ip:port` |
@@ -133,6 +138,7 @@ PortRelay supports three config loading modes (priority high to low):
 |-------|------|----------|-------------|
 | `check_update` | bool | no | Check for new version on startup. Default `false` |
 | `log_level` | string | no | Log level: `"debug"` / `"info"` / `"warn"` / `"error"` / `"fatal"`. Default `"info"`. Shows filename and line number when set to `"debug"` |
+| `max_frame_size` | int | no | Maximum frame payload size in bytes. Default `32768` (32KB). **Must match server configuration.** |
 | `name` | string | yes | Must match server tunnel name |
 | `type` | string | yes | `"tunnel"` |
 | `listen_protocol` | string | yes | Local listen protocol: `"tcp"` / `"udp"` / `"all"` |
@@ -147,7 +153,7 @@ PortRelay supports three config loading modes (priority high to low):
 |-------|----------|
 | `"tcp"` | Force TCP. Falls back if server doesn't support it (prints warning) |
 | `"udp"` | Force UDP. Same fallback logic |
-| `"auto"` | Prefer the protocol matching `listen_protocol`; otherwise pick the other |
+| `"auto"` | Always tries TCP first, falls back to UDP if TCP connection fails. Independent of `listen_protocol`. |
 
 **The connection always succeeds — no protocol mismatch will cause a hard exit.**
 
@@ -264,6 +270,19 @@ Four transport combinations with different reliability guarantees:
 | TCP in UDP | TCP | UDP | Stop-and-Wait ARQ | [kcp-go](https://github.com/xtaci/kcp-go) |
 
 **UDP-in-TCP auto-reconnect**: On TCP disconnect, the client reconnects indefinitely. The server treats each reconnect as a fresh connection.
+
+### KCP (TCP-in-UDP) Negotiation
+
+KCP mode is automatically triggered when:
+
+1. Client configures `transport: "tcp"` or `"auto"`
+2. Server only listens on UDP (`listen_protocol: "udp"`)
+3. Client's TCP connection attempt fails
+4. Client sends UDP handshake instead
+5. Server responds with `AcceptedProto = TransportTCP` in handshake ACK
+6. Client establishes a KCP connection over UDP
+
+**Result**: TCP-like reliability over UDP transport, using the [kcp-go](https://github.com/xtaci/kcp-go) protocol for retransmission and congestion control.
 
 ## Update Check
 
