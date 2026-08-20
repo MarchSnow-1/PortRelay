@@ -2,9 +2,12 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	logger "github.com/donnie4w/go-logger/logger"
@@ -36,15 +39,19 @@ type Server struct {
 	sessions   map[uint32]*sessionState
 	sessionsMu sync.RWMutex
 
+	activeConnections int64 // atomic counter
+	maxConnections    int64 // from config
+
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 }
 
 type udpClient struct {
-	tunnel    *config.Proxy
-	addr      net.Addr
-	createdAt time.Time
+	tunnel     *config.Proxy
+	addr       net.Addr
+	createdAt  time.Time
+	lastActive time.Time
 }
 
 type pendingHandshake struct {
@@ -79,16 +86,23 @@ func New(cfg *config.Config) *Server {
 		}
 	}
 
+	maxConn := int64(config.DefaultMaxConnections)
+	if cfg.MaxConnections > 0 {
+		maxConn = int64(cfg.MaxConnections)
+	}
+
 	return &Server{
-		cfg:          cfg,
-		tunnels:      tunnels,
-		serviceConns: make(map[string]net.Conn),
-		udpClients:   make(map[string]*udpClient),
-		kcpSessions:  make(map[uint32]*kcpServerSession),
-		pendingKCP:   make(map[string]*pendingHandshake),
-		sessions:     make(map[uint32]*sessionState),
-		ctx:          ctx,
-		cancel:       cancel,
+		cfg:               cfg,
+		tunnels:           tunnels,
+		serviceConns:      make(map[string]net.Conn),
+		udpClients:        make(map[string]*udpClient),
+		kcpSessions:       make(map[uint32]*kcpServerSession),
+		pendingKCP:        make(map[string]*pendingHandshake),
+		sessions:          make(map[uint32]*sessionState),
+		activeConnections: 0,
+		maxConnections:    maxConn,
+		ctx:               ctx,
+		cancel:            cancel,
 	}
 }
 
@@ -137,6 +151,10 @@ func (s *Server) Start() error {
 		s.wg.Add(1)
 		go s.handleUDP()
 	}
+
+	// Start idle client cleanup goroutine
+	s.wg.Add(1)
+	go s.cleanupIdleClients()
 
 	s.wg.Wait()
 	return nil
@@ -194,6 +212,17 @@ func (s *Server) acceptTCP() {
 
 func (s *Server) handleTCPConnection(conn net.Conn) {
 	defer s.wg.Done()
+
+	// Check connection limit (atomic operation)
+	n := atomic.AddInt64(&s.activeConnections, 1)
+	if n > s.maxConnections {
+		atomic.AddInt64(&s.activeConnections, -1)
+		conn.Close()
+		logger.Warn("TCP connection rejected: limit reached (", s.maxConnections, ")")
+		return
+	}
+	defer atomic.AddInt64(&s.activeConnections, -1)
+
 	defer conn.Close()
 
 	remoteAddr := conn.RemoteAddr().String()
@@ -235,12 +264,50 @@ func (s *Server) handleUDP() {
 		data := make([]byte, n)
 		copy(data, buf[:n])
 
-		if len(data) > 0 && data[0] == protocol.Magic {
+		// Improved packet type detection
+		if s.isRawUDPFrame(data) {
 			s.handleRawUDP(data, addr)
 		} else {
 			s.handleKCPPacket(data, addr)
 		}
 	}
+}
+
+// isRawUDPFrame performs reliable detection of raw UDP protocol frames vs KCP packets.
+func (s *Server) isRawUDPFrame(data []byte) bool {
+	if len(data) < protocol.HeaderSize {
+		return false
+	}
+
+	if data[0] != protocol.Magic {
+		return false
+	}
+
+	// Validate frame type
+	frameType := data[1]
+	validTypes := []byte{
+		protocol.FrameHandshake,
+		protocol.FrameHandshakeAck,
+		protocol.FrameData,
+		protocol.FrameClose,
+	}
+
+	typeValid := false
+	for _, t := range validTypes {
+		if frameType == t {
+			typeValid = true
+			break
+		}
+	}
+	if !typeValid {
+		return false
+	}
+
+	// Validate length consistency
+	declaredLen := binary.BigEndian.Uint16(data[2:4])
+	actualPayloadLen := len(data) - protocol.HeaderSize
+
+	return int(declaredLen) == actualPayloadLen
 }
 
 func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
@@ -307,11 +374,20 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 		logger.Info("[", h.TunnelName, "] Handshake OK | from=", addr, " | transport=", protoName)
 
 		if acceptedProto == protocol.TransportUDP || acceptedProto == protocol.TransportAuto {
+			// Check connection limit
+			n := atomic.AddInt64(&s.activeConnections, 1)
+			if n > s.maxConnections {
+				atomic.AddInt64(&s.activeConnections, -1)
+				logger.Warn("UDP client rejected: limit reached")
+				return
+			}
+
 			s.udpClientsMu.Lock()
 			s.udpClients[clientKey] = &udpClient{
-				tunnel:    tunnel,
-				addr:      addr,
-				createdAt: time.Now(),
+				tunnel:     tunnel,
+				addr:       addr,
+				createdAt:  time.Now(),
+				lastActive: time.Now(),
 			}
 			s.udpClientsMu.Unlock()
 		}
@@ -319,13 +395,15 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 	}
 
 	if frame.Type == protocol.FrameData {
-		s.udpClientsMu.RLock()
+		s.udpClientsMu.Lock()
 		client, ok := s.udpClients[clientKey]
-		s.udpClientsMu.RUnlock()
 		if !ok {
+			s.udpClientsMu.Unlock()
 			logger.Warn("Data frame from unauthenticated client ", addr)
 			return
 		}
+		client.lastActive = time.Now()
+		s.udpClientsMu.Unlock()
 
 		d, err := protocol.DecodeData(frame.Payload)
 		if err != nil {
@@ -355,6 +433,7 @@ func (s *Server) handleRawUDP(data []byte, addr net.Addr) {
 			s.udpClientsMu.Lock()
 			delete(s.udpClients, clientKey)
 			s.udpClientsMu.Unlock()
+			atomic.AddInt64(&s.activeConnections, -1)
 			logger.Info("[", client.tunnel.Name, "] Tunnel closed from ", addr)
 		}
 		return
@@ -383,6 +462,15 @@ func (s *Server) handleKCPPacket(data []byte, addr net.Addr) {
 			return
 		}
 
+		// Check connection limit
+		n := atomic.AddInt64(&s.activeConnections, 1)
+		if n > s.maxConnections {
+			atomic.AddInt64(&s.activeConnections, -1)
+			s.kcpSessionsMu.Unlock()
+			logger.Warn("KCP session rejected: limit reached (", s.maxConnections, ")")
+			return
+		}
+
 		kcpConn := transport.NewKCPConn(convID, s.udpConn, addr, s.udpConn.LocalAddr())
 		ks = &kcpServerSession{
 			kcpConn: kcpConn,
@@ -408,6 +496,7 @@ func (s *Server) handleKCPSession(ks *kcpServerSession) {
 		s.kcpSessionsMu.Lock()
 		delete(s.kcpSessions, ks.kcpConn.ConvID())
 		s.kcpSessionsMu.Unlock()
+		atomic.AddInt64(&s.activeConnections, -1)
 	}()
 
 	for {
@@ -493,11 +582,11 @@ func (s *Server) authenticate(tunnelName, passwd string) (*config.Proxy, byte) {
 		return nil, protocol.StatusTunnelNotFound
 	}
 
-	if passwd == tunnel.Passwd {
+	if subtle.ConstantTimeCompare([]byte(passwd), []byte(tunnel.Passwd)) == 1 {
 		return tunnel, protocol.StatusOK
 	}
 
-	if s.cfg.AdminPasswd != "" && passwd == s.cfg.AdminPasswd {
+	if s.cfg.AdminPasswd != "" && subtle.ConstantTimeCompare([]byte(passwd), []byte(s.cfg.AdminPasswd)) == 1 {
 		return tunnel, protocol.StatusOK
 	}
 
@@ -593,6 +682,16 @@ func (s *Server) forwardData(tunnel *config.Proxy, d *protocol.Data, clientAddr 
 	if ss.svcConn != nil && len(d.InnerPayload) > 0 {
 		if _, err := ss.svcConn.Write(d.InnerPayload); err != nil {
 			logger.Error("[", tunnel.Name, "] Write to ", tunnel.ServiceTarget, " failed: ", err)
+
+			// Send close frame and clean up session
+			s.sendClose(clientConn, clientAddr, d.SessionID, protocol.CloseTargetUnreachable)
+			s.sessionsMu.Lock()
+			delete(s.sessions, d.SessionID)
+			s.sessionsMu.Unlock()
+			if ss.svcConn != nil {
+				ss.svcConn.Close()
+			}
+			return
 		}
 	}
 }
@@ -621,23 +720,55 @@ func (s *Server) readFromService(ss *sessionState) {
 			return
 		}
 
-		data := &protocol.Data{
-			SessionID:    ss.sessionID,
-			InnerProto:   ss.innerProto,
-			InnerPayload: buf[:n],
+		payload := buf[:n]
+		maxChunk := protocol.MaxFramePayloadSize - 5 // subtract Data header (sessionID + proto)
+
+		if ss.clientAddr != nil {
+			// UDP datagram path: datagrams are atomic and cannot be split.
+			// Drop oversized datagrams instead of chunking.
+			if len(payload) > maxChunk {
+				logger.Warn("[", ss.tunnelName, "] Dropping oversized UDP datagram (", len(payload), " bytes, limit ", maxChunk, ")")
+				continue
+			}
+
+			data := &protocol.Data{
+				SessionID:    ss.sessionID,
+				InnerProto:   ss.innerProto,
+				InnerPayload: payload,
+			}
+			frame := &protocol.Frame{
+				Type:    protocol.FrameData,
+				Payload: protocol.EncodeData(data),
+			}
+			if _, err := s.udpConn.WriteTo(protocol.EncodeFrame(frame), ss.clientAddr); err != nil {
+				logger.Debug("UDP write to client failed: ", err)
+			}
+			continue
 		}
 
-		frame := &protocol.Frame{
-			Type:    protocol.FrameData,
-			Payload: protocol.EncodeData(data),
-		}
+		// TCP/KCP stream path: chunk large data into multiple frames
+		for len(payload) > 0 {
+			chunkSize := len(payload)
+			if chunkSize > maxChunk {
+				chunkSize = maxChunk
+			}
 
-		if ss.clientConn != nil {
+			data := &protocol.Data{
+				SessionID:    ss.sessionID,
+				InnerProto:   ss.innerProto,
+				InnerPayload: payload[:chunkSize],
+			}
+
+			frame := &protocol.Frame{
+				Type:    protocol.FrameData,
+				Payload: protocol.EncodeData(data),
+			}
+
 			if err := protocol.WriteFrame(ss.clientConn, frame); err != nil {
 				return
 			}
-		} else if ss.clientAddr != nil {
-			s.udpConn.WriteTo(protocol.EncodeFrame(frame), ss.clientAddr)
+
+			payload = payload[chunkSize:]
 		}
 	}
 }
@@ -688,4 +819,42 @@ func (s *Server) sendClose(conn net.Conn, addr net.Addr, sessionID uint32, reaso
 
 type ioReader interface {
 	Read([]byte) (int, error)
+}
+
+func (s *Server) cleanupIdleClients() {
+	defer s.wg.Done()
+
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now()
+			idleTimeout := 10 * time.Minute
+
+			// Clean up idle UDP clients
+			s.udpClientsMu.Lock()
+			for key, client := range s.udpClients {
+				if now.Sub(client.lastActive) > idleTimeout {
+					delete(s.udpClients, key)
+					atomic.AddInt64(&s.activeConnections, -1)
+					logger.Debug("Cleaned up idle UDP client: ", key)
+				}
+			}
+			s.udpClientsMu.Unlock()
+
+			// Clean up stale pending KCP handshakes
+			s.pendingKCPMu.Lock()
+			for key, pending := range s.pendingKCP {
+				if now.Sub(pending.createdAt) > 30*time.Second {
+					delete(s.pendingKCP, key)
+					logger.Debug("Cleaned up stale pending KCP: ", key)
+				}
+			}
+			s.pendingKCPMu.Unlock()
+		}
+	}
 }
