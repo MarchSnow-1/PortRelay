@@ -18,7 +18,18 @@ type Config struct {
 	ListenProtocol string  `json:"listen_protocol,omitempty"`
 	CheckUpdate    bool    `json:"check_update,omitempty"`
 	LogLevel       string  `json:"log_level,omitempty"` // "debug", "info", "warn", "error", "fatal"
+	MaxFrameSize   int     `json:"max_frame_size,omitempty"`  // default 32768 (32KB)
+	MaxConnections int     `json:"max_connections,omitempty"` // server-only, default 1000
 }
+
+const (
+	DefaultMaxFrameSize    = 32768
+	MinMaxFrameSize        = 1024
+	MaxMaxFrameSize        = 65535
+	DefaultMaxConnections  = 1000
+	MinMaxConnections      = 1
+	MaxMaxConnections      = 100000
+)
 
 type Proxy struct {
 	Name string `json:"name"`
@@ -105,6 +116,13 @@ func (c *Config) Validate() error {
 	}
 	if len(c.Proxies) == 0 {
 		return ErrEmptyProxies
+	}
+
+	if c.MaxFrameSize != 0 && (c.MaxFrameSize < MinMaxFrameSize || c.MaxFrameSize > MaxMaxFrameSize) {
+		return fmt.Errorf("max_frame_size must be between %d and %d", MinMaxFrameSize, MaxMaxFrameSize)
+	}
+	if c.Mode == "server" && c.MaxConnections != 0 && (c.MaxConnections < MinMaxConnections || c.MaxConnections > MaxMaxConnections) {
+		return fmt.Errorf("max_connections must be between %d and %d", MinMaxConnections, MaxMaxConnections)
 	}
 
 	for i := range c.Proxies {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/MarchSnow-1/PortRelay/client"
 	"github.com/MarchSnow-1/PortRelay/config"
+	"github.com/MarchSnow-1/PortRelay/protocol"
 	"github.com/MarchSnow-1/PortRelay/server"
 	"github.com/MarchSnow-1/PortRelay/update"
 )
@@ -94,7 +95,14 @@ func main() {
 	}
 	initLogger(logLevel)
 
-	logger.Info("PortRelay starting: name=\"", cfg.Name, "\" mode=", cfg.Mode, " proxies=", len(cfg.Proxies), " version=", version)
+	// Set global frame size limit
+	maxFrameSize := config.DefaultMaxFrameSize
+	if cfg.MaxFrameSize > 0 {
+		maxFrameSize = cfg.MaxFrameSize
+	}
+	protocol.SetMaxFramePayloadSize(maxFrameSize)
+
+	logger.Info("PortRelay starting: name=\"", cfg.Name, "\" mode=", cfg.Mode, " proxies=", len(cfg.Proxies), " version=", version, " max_frame_size=", maxFrameSize)
 
 	if cfg.CheckUpdate {
 		update.CheckForUpdate(version)
