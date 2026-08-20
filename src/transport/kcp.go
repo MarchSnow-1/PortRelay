@@ -2,11 +2,13 @@ package transport
 
 import (
 	"encoding/binary"
-	"math/rand"
 	"net"
 	"sync"
 	"time"
 
+	logger "github.com/donnie4w/go-logger/logger"
+
+	"github.com/MarchSnow-1/PortRelay/protocol"
 	"github.com/xtaci/kcp-go/v5"
 )
 
@@ -57,7 +59,7 @@ func DialKCP(address string) (*KCPConn, error) {
 		return nil, err
 	}
 
-	convID := rand.Uint32()
+	convID := protocol.SecureUint32()
 
 	return newKCPConn(convID, conn, raddr, conn.LocalAddr()), nil
 }
@@ -84,7 +86,9 @@ func newKCPConn(convID uint32, conn net.PacketConn, remoteAddr net.Addr, localAd
 		if kc.IsClosed() {
 			return
 		}
-		kc.conn.WriteTo(buf[:size], kc.remoteAddr)
+		if _, err := kc.conn.WriteTo(buf[:size], kc.remoteAddr); err != nil {
+			logger.Debug("KCP output write error: ", err)
+		}
 	}
 
 	kc.kcp = kcp.NewKCP(convID, output)
@@ -108,13 +112,6 @@ func (k *KCPConn) updateLoop() {
 		case <-k.updateStop:
 			return
 		case <-ticker.C:
-			k.closeMu.RLock()
-			if k.closed {
-				k.closeMu.RUnlock()
-				return
-			}
-			k.closeMu.RUnlock()
-
 			k.kcp.Update()
 		}
 	}
