@@ -35,6 +35,19 @@ const (
 
 const HeaderSize = 4
 
+// MaxFramePayloadSize is the maximum allowed frame payload size in bytes.
+// Default 32KB; set via SetMaxFramePayloadSize from config at startup.
+var MaxFramePayloadSize = 32768
+
+// SetMaxFramePayloadSize sets the global frame payload limit.
+// Values outside [1024, 65535] fall back to the 32KB default.
+func SetMaxFramePayloadSize(size int) {
+	if size < 1024 || size > 65535 {
+		size = 32768
+	}
+	MaxFramePayloadSize = size
+}
+
 type Frame struct {
 	Type    byte
 	Payload []byte
@@ -91,6 +104,10 @@ func ReadFrame(r io.Reader) (*Frame, error) {
 	}
 	length := binary.BigEndian.Uint16(header[2:4])
 
+	if int(length) > MaxFramePayloadSize {
+		return nil, fmt.Errorf("frame payload size %d exceeds limit %d", length, MaxFramePayloadSize)
+	}
+
 	if length > 0 {
 		f.Payload = make([]byte, length)
 		if _, err := io.ReadFull(r, f.Payload); err != nil {
@@ -114,6 +131,10 @@ func ParseFrameFromDatagram(data []byte) (*Frame, error) {
 		Type: data[1],
 	}
 	length := binary.BigEndian.Uint16(data[2:4])
+
+	if int(length) > MaxFramePayloadSize {
+		return nil, fmt.Errorf("datagram payload size %d exceeds limit %d", length, MaxFramePayloadSize)
+	}
 
 	if int(HeaderSize+length) != len(data) {
 		return nil, fmt.Errorf("datagram length mismatch: header says %d, actual payload %d", length, len(data)-HeaderSize)
