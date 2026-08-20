@@ -181,7 +181,7 @@ PortRelay 支持三种配置传入方式（优先级从高到低）:
   "log_level": "info", // 日志级别: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
-      "name": "v4-to-v6-tcp", // 你的配置文件命名
+      "name": "local-v4-to-remote-v6-tcp", // 你的配置文件命名
       "type": "direct", // 直接转发模式
       "protocol": "tcp", // 要转发的端口的协议
       "listen": "0.0.0.0:8080", // 本地监听端口, 发往此端口的数据将全部转发至 Target

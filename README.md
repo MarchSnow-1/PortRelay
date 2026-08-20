@@ -181,7 +181,7 @@ No server required. Fixed IPv4 ↔ IPv6 port forwarding.
   "log_level": "info", // Log level: "debug" / "info" / "warn" / "error" / "fatal"
   "proxies": [
     {
-      "name": "v4-to-v6-tcp", // Rule name
+      "name": "local-v4-to-remote-v6-tcp", // Rule name
       "type": "direct", // Direct forwarding mode
       "protocol": "tcp", // Protocol to forward: "tcp" / "udp" / "all"
       "listen": "0.0.0.0:8080", // Local listen port, traffic here is forwarded to target
