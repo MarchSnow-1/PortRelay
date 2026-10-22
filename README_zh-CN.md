@@ -6,8 +6,8 @@
 
 <!-- Badges -->
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
-[![Golang](https://img.shields.io/badge/Golang-1.24%2B-green?style=for-the-badge)](https://go.dev)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%2013%2B%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay)
+[![Golang](https://img.shields.io/badge/Golang-1.27.3%2B-green?style=for-the-badge)](https://go.dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange?style=for-the-badge)](LICENSE)
 <br>
 [![GitHub Release](https://img.shields.io/github/v/release/MarchSnow-1/PortRelay?style=for-the-badge)](https://github.com/MarchSnow-1/PortRelay/releases)
@@ -300,7 +300,8 @@ KCP 模式会在以下情况自动触发:
 
 | 依赖 | 说明 |
 |------|------|
-| Go | ≥ 1.24 |
+| Go | ≥ 1.27.3 |
+| macOS | ≥ 13 |
 
 ### 构建
 

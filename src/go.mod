@@ -1,6 +1,6 @@
 module github.com/MarchSnow-1/PortRelay
 
-go 1.24.0
+go 1.27.3
 
 require (
 	github.com/donnie4w/go-logger v0.28.0
