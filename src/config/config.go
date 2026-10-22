@@ -17,18 +17,18 @@ type Config struct {
 	ListenPort     string  `json:"listen_port,omitempty"`
 	ListenProtocol string  `json:"listen_protocol,omitempty"`
 	CheckUpdate    bool    `json:"check_update,omitempty"`
-	LogLevel       string  `json:"log_level,omitempty"` // "debug", "info", "warn", "error", "fatal"
+	LogLevel       string  `json:"log_level,omitempty"`       // "debug", "info", "warn", "error", "fatal"
 	MaxFrameSize   int     `json:"max_frame_size,omitempty"`  // default 32768 (32KB)
 	MaxConnections int     `json:"max_connections,omitempty"` // server-only, default 1000
 }
 
 const (
-	DefaultMaxFrameSize    = 32768
-	MinMaxFrameSize        = 1024
-	MaxMaxFrameSize        = 65535
-	DefaultMaxConnections  = 1000
-	MinMaxConnections      = 1
-	MaxMaxConnections      = 100000
+	DefaultMaxFrameSize   = 32768
+	MinMaxFrameSize       = 1024
+	MaxMaxFrameSize       = 65535
+	DefaultMaxConnections = 1000
+	MinMaxConnections     = 1
+	MaxMaxConnections     = 100000
 )
 
 type Proxy struct {

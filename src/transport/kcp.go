@@ -31,11 +31,11 @@ type KCPConn struct {
 	remoteAddr net.Addr
 	localAddr  net.Addr
 
-	readBuf   []byte
-	readPos   int
-	readLen   int
-	readMu    sync.Mutex
-	readCond  *sync.Cond
+	readBuf  []byte
+	readPos  int
+	readLen  int
+	readMu   sync.Mutex
+	readCond *sync.Cond
 
 	writeMu sync.Mutex
 

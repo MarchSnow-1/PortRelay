@@ -14,11 +14,11 @@ const (
 	FrameData         byte = 0x03
 	FrameClose        byte = 0x04
 
-	StatusOK              byte = 0x00
-	StatusAuthFailed      byte = 0x01
-	StatusTunnelNotFound  byte = 0x02
+	StatusOK               byte = 0x00
+	StatusAuthFailed       byte = 0x01
+	StatusTunnelNotFound   byte = 0x02
 	StatusProtocolMismatch byte = 0x03
-	StatusInternalError   byte = 0x04
+	StatusInternalError    byte = 0x04
 
 	TransportTCP  byte = 0x01
 	TransportUDP  byte = 0x02
@@ -27,10 +27,10 @@ const (
 	InnerProtoTCP byte = 0x01
 	InnerProtoUDP byte = 0x02
 
-	CloseNormal           byte = 0x00
-	CloseTimeout          byte = 0x01
+	CloseNormal            byte = 0x00
+	CloseTimeout           byte = 0x01
 	CloseTargetUnreachable byte = 0x02
-	CloseProtocolError    byte = 0x03
+	CloseProtocolError     byte = 0x03
 )
 
 const HeaderSize = 4
