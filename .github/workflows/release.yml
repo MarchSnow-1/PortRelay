@@ -90,6 +90,14 @@ jobs:
         with:
           go-version-file: src/go.mod
 
+      # 发布前的漏洞门禁：govulncheck 按 OSV 数据库核对实际调用到的符号，命中即以非零退出码阻断构建
+      # 版本固定到 v1.9.0，因为 @latest 会让同一次发版在不同日子得到不同结论，失败时无法复现
+      # The pre-release vulnerability gate: govulncheck matches the symbols the build actually calls against the OSV database, and a hit exits non-zero so the artifacts are never built
+      # The version is pinned to v1.9.0, because @latest would let the same release conclude differently on different days and leave a failure unreproducible
+      - name: govulncheck
+        working-directory: src
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
       - name: Build
         shell: bash
         run: |
